@@ -1,6 +1,3 @@
-//A CUDA based implementation of the Smith Waterman Algorithm
-//Author: Romil Bhardwaj
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include<time.h>
@@ -9,25 +6,25 @@
 #include <stdlib.h>
 #define max(a,b) (((a)>(b))?(a):(b))
 
-//Define the costs here
+//Costos de la funcion SW
 #define indel -1
 #define match 2
 #define mismatch -1
 #define TILE_WIDTH 8
 #define NUM_THREADS 32
 
-//CHANGE THIS VALUE TO CHANGE THE NUMBER OF ELEMENTS
+
 const int arraySize = 65536;
 #define Width arraySize+1
 int SIZE = arraySize+1 * arraySize+1;
 int SIZED = SIZE * sizeof(int);
-//CHANGE THIS VALUE TO CHANGE THE NUMBER OF ELEMENTS
+
 
 cudaError_t SWHelper(int (*c)[arraySize+1], const char *a, const char *b, size_t size);
 cudaError_t SWHelperL(int* c, const char *a, const char *b, size_t size);
 
 
-__global__ void SmithWKernelExpand(int (*c)[arraySize+1], const char *a, const char *b, const int *k)		//Declared consts to increase access speed
+__global__ void SmithWKernelExpand(int (*c)[arraySize+1], const char *a, const char *b, const int *k)
 {
     int i = threadIdx.x+1;
 	int j = ((*k)-i)+1;
@@ -39,7 +36,7 @@ __global__ void SmithWKernelExpand(int (*c)[arraySize+1], const char *a, const c
 	else
 		northwest=c[i-1][(j)-1]+mismatch;		//Mismatch
     c[i][j] = max(max(north, west),max(northwest,0));
-	//c[i][j]=(*k);						//Debugging - Print the antidiag num
+
 }
 
 __global__ void SmithWKernelShrink(int (*c)[arraySize+1], const char *a, const char *b, const int *k)
@@ -54,12 +51,12 @@ __global__ void SmithWKernelShrink(int (*c)[arraySize+1], const char *a, const c
 	else
 		northwest=c[i-1][(j)-1]+mismatch;		//Mismatch
     c[i][j] = max(max(north, west),max(northwest,0));
-	//c[i][j]=(*k);						//Debugging - Print the antidiag num
+
 }
 
 
-__global__ void SmithWKernelExpandL(int *c, const char *a, const char *b, const int *k)		//Declared consts to increase access speed
-{
+__global__ void SmithWKernelExpandL(int *c, const char *a, const char *b, const int *k){
+
   int i = threadIdx.x+1;
 	int j = ((*k)-i)+1;
 	int north=c[i*(arraySize+1)+(j)-1]+indel;			//Indel
@@ -70,7 +67,7 @@ __global__ void SmithWKernelExpandL(int *c, const char *a, const char *b, const 
 	else
 		northwest=c[i-1+(j)-1]+mismatch;		//Mismatch
     c[i*(arraySize+1)+j] = max(max(north, west),max(northwest,0));	
-	//c[i][j]=(*k);						//Debugging - Print the antidiag num
+
 }
 
 __global__ void SmithWKernelShrinkL(int *c, const char *a, const char *b, const int *k)
@@ -85,7 +82,7 @@ __global__ void SmithWKernelShrinkL(int *c, const char *a, const char *b, const 
 	else
 		northwest=c[i*(arraySize+1)-1+(j)-1]+mismatch;		//Mismatch
     c[i*(arraySize+1)+j] = max(max(north, west),max(northwest,0));
-	//c[i][j]=(*k);						//Debugging - Print the antidiag num
+
 }
 
 void print(int c[arraySize+1][arraySize+1]){
@@ -134,11 +131,10 @@ __global__ void MaximosTiled(int *c,int &i,int &j)
 			i=Row*Width;
 			j=ph*TILE_WIDTH + tx;
 		}
-
+		__syncthreads();
 		}
-
-	
 }
+
 
 void traceback_tiled(int *c, char a[], char b[]){
 	int j=0,i=0;
@@ -233,12 +229,12 @@ void traceback(int c[arraySize+1][arraySize+1], char a[], char b[]){
 
 int main()
 {
-	char b[arraySize];//{'a','c','a','c','a','c','t','a'};
-	char a[arraySize];//{'a','g','c','a','c','a','c','a'};
+	char b[arraySize];
+	char a[arraySize];
 	
 	int i=0;
 	
-	//Generating the sequences:
+	//Generar las secuencias
 	
 	srand (time(NULL));
 	printf("\nString a is: ");
@@ -285,7 +281,7 @@ int main()
 	clock_t start=clock();
 
     // Run the SW Helper function
-    cudaError_t cudaStatus = SWHelper(c, a, b, arraySize);
+    cudaError_t cudaStatus = SWHelperL(h_c, a, b, arraySize);
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "SWHelper failed!");
         return 1;
@@ -295,21 +291,18 @@ int main()
 	print(c);
 
 
-	//cudaError_t cudaStado= SWHelperL(h_c,a,b,arraySize);
-	//print(c);
 
 
-	//Printing the final score matrix. Uncomment this to see the matrix.
+	//Imprimiendo la matrix final resultado
 	//print(c);
 
 	
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+    // LLamando al cudadevice
+  cudaStatus = cudaDeviceReset();
+  if (cudaStatus != cudaSuccess) {
+      fprintf(stderr, "cudaDeviceReset failed!");
+      return 1;
+  }
 
 	traceback_tiled(h_c,a,b);
 	printf("\n\nEnter any number to exit.");
@@ -319,7 +312,7 @@ int main()
     return 0;
 }
 
-// Helper function for SmithWaterman
+// Funcion de soporte para SW
 cudaError_t SWHelper(int (*c)[arraySize+1], const char *a, const char *b, size_t size)
 {
     char *dev_a;
